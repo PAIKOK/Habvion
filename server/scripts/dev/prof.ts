@@ -1,0 +1,10 @@
+import { DEMOS } from "@shared/design/demos";
+import { applyAction } from "@shared/design/reducer";
+import { validateDesign } from "@shared/design/validation";
+import { allIssues } from "@shared/design/audit";
+const { design } = DEMOS.find((d) => d.id === "contemporary-courtyard")!.build();
+let t = performance.now(); validateDesign(design); console.log("validateDesign", Math.round(performance.now() - t));
+t = performance.now(); allIssues(design); console.log("allIssues", Math.round(performance.now() - t));
+const f = design.furniture.find((x) => x.catalogId === "sofa-l")!;
+t = performance.now(); const r = applyAction(design, { type: "furniture/update", id: f.id, patch: { x: f.x + 0.5 } }); console.log("move sofa", Math.round(performance.now() - t), r.applied);
+t = performance.now(); applyAction(design, { type: "furniture/add", piece: { id: "zz", catalogId: "plant-floor", roomId: "liv", floor: 0, x: 5, y: 28, rotation: 0 } }); console.log("add plant", Math.round(performance.now() - t));

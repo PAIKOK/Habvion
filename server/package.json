@@ -1,0 +1,29 @@
+{
+  "name": "homebuilder-ai-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "messages": "tsx scripts/messages.ts",
+    "contact:test": "tsx scripts/contact-test.ts",
+    "start": "tsx src/index.ts",
+    "check": "tsc --noEmit",
+    "test": "tsx scripts/run-tests.ts"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^17.0.0",
+    "express": "^5.1.0",
+    "jose": "^6.0.0",
+    "mongodb": "^7.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.9",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "mongodb-memory-server": "^11.3.0"
+  }
+}

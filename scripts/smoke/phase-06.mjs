@@ -1,0 +1,38 @@
+import { newPlot, designState, planPoint, dispatch, editor } from "./helpers.mjs";
+export default async function ({ page, url, check }) {
+  await newPlot(page, url, { width: 30, length: 50, floors: 1 });
+  await dispatch(page, { type: "room/add", room: { id: "liv", name: "Living", type: "living", x: 4, y: 6, width: 14, length: 16, floor: 0 } });
+  await dispatch(page, { type: "room/add", room: { id: "bed", name: "Bedroom", type: "master-bedroom", x: 4, y: 22, width: 13, length: 13, floor: 0 } });
+  await page.getByRole("button", { name: "Furniture", exact: true }).click();
+  check("catalog palette opens with ~185 items", (await page.locator("[data-palette-item]").count()) >= 180);
+  await page.getByLabel("Search furniture").fill("three-seater");
+  await page.locator('[data-palette-item="sofa-3"]').click();
+  let p = await planPoint(page, 11, 7);
+  await page.mouse.click(p.x, p.y);
+  let d = await designState(page);
+  check("sofa placed by clicking near the north wall", d.furniture.length === 1 && d.furniture[0].rotation === 0);
+  await page.getByLabel("Search furniture").fill("");
+  await page.locator('[data-palette-item="coffee-table"]').click();
+  p = await planPoint(page, 11, 11);
+  await page.mouse.click(p.x, p.y);
+  await page.locator('[data-palette-item="rug-large"]').click();
+  p = await planPoint(page, 11, 10);
+  await page.mouse.click(p.x, p.y);
+  await page.locator('[data-palette-item="tv-55"]').click();
+  p = await planPoint(page, 11, 21);
+  await page.mouse.click(p.x, p.y);
+  d = await designState(page);
+  check("TV lands on the south wall facing the sofa", d.furniture.some((f) => f.catalogId === "tv-55" && f.rotation === 180), JSON.stringify(d.furniture.map((f) => [f.catalogId, f.rotation])));
+  await editor(page, { paletteId: null, selected: "bed" });
+  for (const id of ["bed-king", "nightstand", "wardrobe-3", "ceiling-fan"]) await page.getByLabel(`Auto-place ${(await page.locator(`[data-palette-item="${id}"] .palette-name`).innerText())}`).click();
+  d = await designState(page);
+  check("auto-place puts four bedroom pieces", d.furniture.filter((f) => f.roomId === "bed").length === 4, JSON.stringify(d.furniture.map((f) => f.catalogId)));
+  const sofa = d.furniture.find((f) => f.catalogId === "sofa-3");
+  await editor(page, { selected: sofa.id, tool: "select" });
+  await page.keyboard.press("r");
+  check("R rotates the selected piece", (await designState(page)).furniture.find((f) => f.id === sofa.id).rotation === 90 || (await page.getByRole("alert").count()) > 0);
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Furniture", exact: true }).click();
+  await page.screenshot({ path: "artifacts/phase-06-furnished.png" });
+  check("pieces are drawn", (await page.locator("[data-piece-id]").count()) === d.furniture.length);
+}

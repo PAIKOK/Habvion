@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.env
+.env.*
+server/data/
+artifacts/
+*.tsbuildinfo
+*.log
+.DS_Store
+
+# Vercel build output and local project linkage
+.generated/
+.vercel/
+.vercel
+.env*
+
+# Templates with no real values are safe to share (must come after the .env rules).
+!**/.env.example

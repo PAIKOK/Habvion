@@ -1,0 +1,35 @@
+{
+  "name": "homebuilder-ai-fresh",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:mock": "node scripts/dev.mjs --mock",
+    "check": "npm run check --workspace=server && npm run build --workspace=client",
+    "smoke": "node scripts/phase-smoke.mjs",
+    "build:api": "node scripts/build-vercel.mjs",
+    "build:vercel": "npm run build:api && npm run check",
+    "vercel-build": "npm run build:api",
+    "test:vercel": "tsx --tsconfig server/tsconfig.json --test server/scripts/vercel.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "axe-core": "^4.14.0",
+    "esbuild": "^0.28.2",
+    "playwright-core": "^1.63.0",
+    "tsx": "^4.23.0",
+    "typescript": "^6.0.2"
+  },
+  "dependencies": {
+    "@vercel/functions": "^3.9.11"
+  },
+  "engines": {
+    "node": "24.x"
+  }
+}

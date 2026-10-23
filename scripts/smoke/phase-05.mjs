@@ -1,0 +1,38 @@
+import { newPlot, dragPlan, designState, planPoint, dispatch } from "./helpers.mjs";
+export default async function ({ page, url, check }) {
+  await newPlot(page, url, { width: 30, length: 50, floors: 1 });
+  check("setback line is drawn", (await page.locator("[data-setback-line]").count()) === 1);
+  await page.getByRole("button", { name: "Add room" }).click();
+  const added = (await designState(page)).rooms[0];
+  check("Add room respects the front setback", added && added.y >= 5 && added.x >= 3, JSON.stringify(added));
+  await dispatch(page, { type: "room/delete", id: added.id });
+  await page.getByLabel("Room to draw").selectOption("staircase");
+  await page.getByRole("button", { name: "Draw room", exact: true }).click();
+  await dragPlan(page, 4, 8, 18, 24);
+  await page.getByRole("button", { name: "Stair", exact: true }).click();
+  let p = await planPoint(page, 10, 15);
+  await page.mouse.click(p.x, p.y);
+  check("no floor above: stair refused visibly", (await designState(page)).stairs.length === 0 && (await page.getByRole("alert").innerText()).includes("floor"));
+  await page.getByRole("button", { name: "Add a floor" }).click();
+  check("adding a floor switches to it", (await page.getByRole("tablist", { name: "Floors" }).getByRole("tab", { selected: true }).innerText()) === "First");
+  check("floor below is ghosted upstairs", (await page.locator("[data-floor-below]").count()) === 1);
+  await page.getByRole("tab", { name: "Ground" }).click();
+  await page.getByRole("button", { name: "Stair", exact: true }).click();
+  await page.mouse.click(p.x, p.y);
+  const s = (await designState(page)).stairs[0];
+  check("stair placed inside the room", !!s && s.stairType === "dog-legged");
+  check("treads are drawn", (await page.locator(`[data-stair-id="${s.id}"] path`).count()) > 10);
+  await page.getByLabel("Stair type").selectOption("l-shaped");
+  check("type change resizes to the new default", (await designState(page)).stairs[0].width === 9);
+  await page.screenshot({ path: "artifacts/phase-05-ground.png" });
+  await page.getByRole("tab", { name: "First" }).click();
+  check("well is cut upstairs", (await page.locator("[data-stair-well]").count()) === 1);
+  check("arrival is marked upstairs", (await page.locator("[data-stair-arrival]").count()) >= 1);
+  await page.screenshot({ path: "artifacts/phase-05-first.png" });
+  await page.getByRole("tab", { name: "Ground" }).click();
+  const before = (await designState(page)).stairs[0].x;
+  await dragPlan(page, 9, 15, 7, 15);
+  check("stair drags to a new spot", (await designState(page)).stairs[0].x === before - 2);
+  await page.keyboard.press("Delete");
+  check("Delete removes the selected stair", (await designState(page)).stairs.length === 0);
+}

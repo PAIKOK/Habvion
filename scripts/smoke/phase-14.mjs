@@ -1,0 +1,62 @@
+import { designState } from "./helpers.mjs";
+export default async function ({ page, url, check }) {
+  const user = { name: "Meera", email: `p14-${Date.now()}@homebuilder.test`, password: "a long enough password", consent: true };
+  check("fresh account", (await page.request.post(`${url}/api/auth/signup`, { data: user })).ok());
+  await page.goto(url + "/start", { waitUntil: "networkidle" });
+  check("no continue strip before any design", (await page.getByTestId("continue-strip").count()) === 0);
+  await page.getByRole("button", { name: "Create my plot" }).click();
+  await page.waitForURL("**/editor/*");
+  const id = new URL(page.url()).pathname.split("/").pop();
+  check("a new plot gets its own URL", !!id && id.startsWith("design"), id);
+  const status = page.getByTestId("save-status");
+  check("starts saved", (await status.getAttribute("data-status")) === "saved");
+  await page.getByRole("button", { name: "Add room" }).click();
+  check("an edit marks it unsaved", ["pending", "saving"].includes(await status.getAttribute("data-status")));
+  await page.locator('[data-testid="save-status"][data-status="saved"]').waitFor({ timeout: 8000 });
+  check("autosave catches up", (await status.innerText()).includes("All changes saved"));
+  await page.screenshot({ path: "artifacts/phase-14-editor.png" });
+
+  await page.reload({ waitUntil: "networkidle" });
+  await page.locator(".plan-canvas").waitFor();
+  check("the room survives a reload", (await designState(page)).rooms.length === 1);
+  await page.goto(url + "/designs", { waitUntil: "networkidle" });
+  check("My designs lists it", (await page.getByTestId("design-card").count()) === 1);
+  check("continue strip offers it", (await page.getByTestId("continue-strip").getAttribute("href")) === `/editor/${id}`);
+  await page.screenshot({ path: "artifacts/phase-14-designs.png" });
+
+  await page.getByTestId("continue-strip").click();
+  await page.waitForURL(`**/editor/${id}`);
+  await page.getByRole("button", { name: "Share" }).click();
+  const link = await page.getByLabel("Share link").inputValue();
+  check("share gives a /shared/ link", /\/shared\/[A-Za-z0-9_-]{32}$/.test(link), link);
+  const stranger = await page.context().browser().newContext({ viewport: { width: 1440, height: 900 } });
+  const sp = await stranger.newPage();
+  await sp.goto(link, { waitUntil: "networkidle" });
+  check("a stranger sees the shared design", (await sp.getByTestId("viewer").innerText()).includes("READ-ONLY"));
+  check("the viewer has no editing tools", (await sp.getByRole("button", { name: "Draw room" }).count()) === 0 && (await sp.getByRole("button", { name: "Undo" }).count()) === 0);
+  await sp.screenshot({ path: "artifacts/phase-14-shared.png" });
+  await sp.getByRole("button", { name: "3D" }).click();
+  await sp.locator('[data-testid="scene-3d"] canvas').waitFor({ timeout: 15000 });
+  await sp.waitForTimeout(1500);
+  await sp.screenshot({ path: "artifacts/phase-14-shared-3d.png" });
+  await page.getByRole("button", { name: "Stop sharing" }).click();
+  await sp.reload({ waitUntil: "networkidle" });
+  check("stopping sharing kills the link", (await sp.getByRole("heading", { name: "Link not available." }).count()) === 1);
+  await stranger.close();
+
+  await page.goto(url + "/designs", { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: /^Delete / }).click();
+  const confirmBox = page.getByRole("dialog", { name: /^Delete “/ });
+  check("deleting asks first, in the page's own dialog", await confirmBox.isVisible());
+  const box = await confirmBox.boundingBox(), view = page.viewportSize();
+  check("…centred on the screen", !!box && Math.abs(box.x + box.width / 2 - view.width / 2) < 4 && Math.abs(box.y + box.height / 2 - view.height / 2) < 40, JSON.stringify(box));
+  check("…with focus on the safe choice", (await page.evaluate(() => document.activeElement?.textContent)) === "Keep it");
+  await page.keyboard.press("Escape");
+  check("…Escape keeps the design", !(await confirmBox.isVisible()) && (await page.getByTestId("design-card").count()) === 1);
+  await page.getByRole("button", { name: /^Delete / }).click();
+  await confirmBox.getByRole("button", { name: "Delete design" }).click();
+  await page.getByText("No designs yet").waitFor();
+  check("delete removes it", (await page.getByTestId("design-card").count()) === 0);
+  await page.goto(url + `/editor/${id}`, { waitUntil: "networkidle" });
+  check("a deleted design's URL says so", (await page.getByRole("heading", { name: "Design not found." }).count()) === 1);
+}

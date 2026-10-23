@@ -1,0 +1,37 @@
+import { check } from "../check.js";
+import { createDesign } from "@shared/design/createDesign";
+import { applyAction } from "@shared/design/reducer";
+import { estimateBudget } from "@shared/design/budget";
+import { defaultCompound } from "@shared/design/finishes";
+import { inr, compactInr } from "@shared/lib/units";
+import type { HomeDesign } from "@shared/types/home";
+
+check("Indian digit grouping", inr(12345678) === "₹1,23,45,678" && inr(999) === "₹999" && inr(100000) === "₹1,00,000");
+check("crore and lakh labels", compactInr(25000000).includes("crore") && compactInr(450000).includes("lakh"));
+let d: HomeDesign = createDesign({ width: 30, length: 50, floors: 1 });
+const go = (a: Parameters<typeof applyAction>[1]) => {
+  const r = applyAction(d, a);
+  if (r.applied) d = r.design;
+  return r;
+};
+check("an empty plot costs nothing", estimateBudget(d).total === 0);
+go({ type: "room/add", room: { id: "l", name: "Living", type: "living", x: 4, y: 6, width: 12, length: 15, floor: 0 } });
+const b1 = estimateBudget(d);
+check("structure is area × rate", b1.groups.find((g) => g.id === "structure")!.lines.some((l) => l.amount === 180 * 1900));
+check("total includes 5% contingency", b1.total === b1.subtotal + Math.round(b1.subtotal * 0.05));
+check("built-up area is counted", b1.builtUpArea === 180);
+go({ type: "room/add", room: { id: "g", name: "Garden", type: "garden", x: 4, y: 30, width: 12, length: 10, floor: 0 } });
+check("a garden adds lawn but no structure", estimateBudget(d).builtUpArea === 180 && estimateBudget(d).groups.find((g) => g.id === "finishes")!.lines.some((l) => l.label === "Lawn"));
+go({ type: "door/add", door: { id: "dr", roomId: "l", side: "south", offset: 6, width: 3, height: 7, doorType: "panel", swing: "left" } });
+check("doors are priced by type", estimateBudget(d).groups.find((g) => g.id === "openings")!.total === 8500);
+go({ type: "furniture/add", piece: { id: "s", catalogId: "sofa-3", roomId: "l", x: 10, y: 7.6, rotation: 0, floor: 0 } });
+const b2 = estimateBudget(d);
+check("furniture is priced from the catalog", b2.groups.find((g) => g.id === "furniture")!.total === 45000);
+go({ type: "compound/set", compound: defaultCompound(d.plot) });
+check("compound and gates are priced", estimateBudget(d).groups.some((g) => g.id === "site"));
+go({ type: "systems/set", patch: { smartHome: true, security: true } });
+check("systems are priced", estimateBudget(d).groups.find((g) => g.id === "systems")!.lines.length === 2);
+go({ type: "roof/set", roof: { type: "gable", materialId: "clay-tile", pitchDeg: 30, overhangFt: 1 } });
+const roof = estimateBudget(d).groups.find((g) => g.id === "roof")!;
+check("pitched roofs cost more than their footprint", Math.abs(roof.total - (180 / Math.cos(Math.PI / 6)) * 320) < 1);
+check("no line is negative", estimateBudget(d).groups.every((g) => g.lines.every((l) => l.amount > 0)));

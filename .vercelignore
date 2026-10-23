@@ -1,0 +1,15 @@
+# Local secrets and private data must never enter a deployment upload.
+**/.env
+**/.env.*
+server/data/**
+artifacts/**
+integrations/**
+
+# Installed dependencies and build outputs are regenerated in Vercel's build.
+**/node_modules/**
+client/dist/**
+.generated/**
+.vercel/**
+.git/**
+**/*.log
+**/.DS_Store
